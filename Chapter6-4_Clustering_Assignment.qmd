@@ -1,0 +1,428 @@
+---
+title: "Chapter6-4_Clustering_Assignment"
+format: html
+editor: visual
+---
+
+## Assignment 6.4 - Market Milk Clustering with K-Means
+
+### First thing we've should "readr" library to read csv file data, because build-in function of R programming are not correct as below
+
+# K-means Step
+
+#### Choose Elbow Method to find number of cluster from a data set
+
+![](images/clipboard-2508118528.png){fig-align="left" width="857"}
+
+![](images/clipboard-1342105054.png){fig-align="left" width="862"}
+
+![](images/clipboard-138465678.png){fig-align="left" width="870"}
+
+```{r}
+rm(list = ls())
+
+# Elbow Method
+elbowPointFunc = function(data) {
+  wss <- numeric(15)
+  for (i in 1:15) {
+    kmeans_model <- kmeans(data, centers = i)
+    wss[i] <- sum(kmeans_model$withinss)
+  }
+  
+  plot(1:15, wss, type="b", pch = 19, frame = FALSE, col = "blue", xlab="Number of Clusters (k)", ylab="Within groups sum of squares")
+  
+  # Get The best 
+  diff.wss = diff(diff(wss))
+  print(wss)
+  print(diff(wss))
+  print(diff(diff(wss)))
+  print(which.max(diff.wss))
+  elbow_point <- which.max(diff(diff(wss))) + 1
+  return(elbow_point)
+}
+```
+
+### Load data from data set
+
+```{r}
+# get dataset path
+# curPath = paste(getwd() , "/BABA_Week5Assignment-MarketMilkLabel.csv", sep ="")
+curPath = paste(getwd() , "/Milk.csv", sep ="")
+
+# Read dataset
+# Wrong csv reader in thai langguage
+# data.set = read.csv(curPath, header = TRUE, sep = ",", fileEncoding = "UTF-8")
+
+# Use readr library to read dataset file.
+library(readr)
+data.set <- read_csv(curPath, locale = locale(encoding = "UTF-8"), show_col_types = FALSE)
+
+data.set
+colnames(data.set)
+set.seed(100)
+```
+
+### Find information relationship
+
+```{r}
+# ingredien data set
+ind.g1.data.set = data.set[c('volume','pricePerVolume','oatMilk','cornMilk','almodMilk','soyMilk','barleyMaltPowder','abMaltExtract','cowMilk','cowMilkLowFat','cowMilkLactoseFree','yoghurtFatFree','skimMilkPowder','Low Fat formula milk','blackSesame','sugar','lactose','chocolate','matchaPowder','honey', 'sucrose')]
+
+# sum of sugar
+ind.g1.data.set$sugar <- rowSums(ind.g1.data.set[, c('sugar', 'lactose', 'honey')], na.rm = TRUE)
+# remove column
+ind.g1.data.set <- ind.g1.data.set[, !names(ind.g1.data.set) %in% c('lactose', 'sucrose', 'honey')]
+ind.g1.data.set[is.na(ind.g1.data.set)] <- 0
+ind.g1.data.set.scaled <- as.data.frame(scale(ind.g1.data.set))
+ind.g1.data.set.scaled
+
+# png("Group1_pairs.png", width = 2500, height = 2000)
+pairs(
+   ind.g1.data.set.scaled,
+   main = "Group 1",
+   pch= 16,
+   cex = 1.5,
+   cex.axis = 1.5
+)
+# dev.off()
+
+# ingredien data set
+ind.g2.data.set = data.set[c('volume','pricePerVolume','vitamin...26','canolaOil','soybeanOil','palmOil','coconutOil','butterMilkPowder','Inulin','ginkgobilobaExtract','fruitJuice','calciumCarbonate','fishCollagen','Nuka','organicSeed')]
+
+names(ind.g2.data.set)[names(ind.g2.data.set) == 'vitamin...26'] <- 'vitamin'
+
+ind.g2.data.set[is.na(ind.g2.data.set)] <- 0
+ind.g2.data.set.scaled <- as.data.frame(scale(ind.g2.data.set))
+ind.g2.data.set.scaled
+
+# png("Group2_pairs.png", width = 2500, height = 2000)
+pairs(
+   ind.g2.data.set.scaled,
+   main = "Group 2",
+   pch= 16,
+   cex = 1.5,
+   cex.axis = 1.5
+)
+# dev.off()
+```
+
+------------------------------------------------------------------------
+
+# 1. Price Per Volume Clustering
+
+------------------------------------------------------------------------
+
+### Step 1: Selecting data set column and Normalization data in format Z-score
+
+Standardization เพื่อให้ข้อมูลแต่ละตัวแปรมีค่าเฉลี่ยเป็น 0 และส่วนเบี่ยงเบนมาตรฐานเป็น 1
+
+```         
+•   ค่าที่ต่ำกว่าค่าเฉลี่ยจะเป็น **ค่าลบ**
+
+•   ค่าที่สูงกว่าค่าเฉลี่ยจะเป็น **ค่าบวก**
+```
+
+```{r}
+price.data.set <- data.set[c('volume', 'pricePerVolume')]
+
+price.data.set <- as.data.frame(scale(price.data.set))
+price.data.set
+```
+
+### Step 2: Cleaning Data set
+
+```{r}
+# Replace NA value to ZERO value
+# price.data.set[is.na(price.data.set)] <- 0
+price.data.set
+```
+
+### Step 3 Plot raw data set
+
+```{r}
+summary(price.data.set)
+# mean.price = mean(price.data.set$pricePerVolume)
+# mean.price
+
+# plot(
+#    x = price.data.set$volume,
+#    y = price.data.set$pricePerVolume,
+#    xlab = "Volume (milliliter)",
+#    ylab = "Price per milliliter",
+#    main = "Price Per Volume", 
+#    pch= 16,
+#    col = ifelse(price.data.set$pricePerVolume < mean.price, "green", "red")
+# )
+# abline(h = mean.price, col = "orange", lwd = 2, lty = 2)
+# text(x = max(price.data.set$volume),
+#      y = mean.price, 
+#      labels = paste("Mean =", round(mean.price, 4), " Bath per milliliter"), 
+#      pos = 3, 
+#      col = "orange",
+#      cex = 1)
+```
+
+### Step 4: Find a Cluster amount
+
+Select Cluster Number
+
+```{r}
+elbowPoint.point = elbowPointFunc(price.data.set[, 1:2])
+```
+
+### Step 4: Clustering and summaries
+
+```{r}
+# Choose The number of cluseter "k" by Elbow method -> best value is 4
+cluster.size = 4
+
+# Cluseting with K-means
+model.price = kmeans(price.data.set[, 1:2], cluster.size)
+model.price
+
+# Define color of each cluster
+cluster_colors <- c("purple", "green", "orange", "red", "blue")[model.price$cluster]
+
+# Plot clustering graph
+plot(
+   x = price.data.set$volume,
+   y = price.data.set$pricePerVolume,
+   xlab = "Volume",
+   ylab = "Price per Volumn",
+   main = "Cluster of Price per Volumn", 
+   pch=16,
+   col = cluster_colors
+)
+legend("topright",
+       legend = paste("Cluster", 1:cluster.size), 
+       fill = c("purple", "green", "orange", "red", "blue")[1:cluster.size], 
+       title = "Clusters",
+       xpd = TRUE,
+       inset = c(0.3, 0))
+
+# Plot centroid
+points(
+  x = model.price$centers[, "volume"],
+  y = model.price$centers[, "pricePerVolume"],
+  pch=8,
+  cex=2,
+  col="red"
+)
+
+price.data.set$cluster <- model.price$cluster
+result <- data.frame(ProductName = data.set$productName, Price = data.set$pricePerVolume, Cluster = price.data.set$cluster)
+for (cluster.no in sort(unique(result$Cluster))) {
+  print(result[result$Cluster == cluster.no,])
+}
+
+```
+
+#### กราฟนี้แสดงให้เห็นว่า **ปริมาณและราคาต่อหน่วยมีผลต่อการแบ่งกลุ่มตลาดผลิตภัณฑ์นม** และสามารถนำไปใช้ในการตัดสินใจทางธุรกิจเพื่อวางตำแหน่งผลิตภัณฑ์ให้เหมาะสมกับกลุ่มเป้าหมายที่แตกต่างกัน
+
+อาทิ ร้านกาแฟที่ต้องการนม ที่มีความคุ้มค่าสูงสุด ทางบริษัทจะต้องตั้งเป้าหมายในการทำการตลาด สำหรับลูกค้ากลุ่มนี้โดยเน้นการขายสินค้าที่มี ราคา ต่อ ปริมาตร ที่คุ้มค่ามากที่สุด
+
+![](images/clipboard-3713228594.png){fig-align="left" width="547"}
+
+![](images/IMG_1650-01.JPG){fig-align="left" width="545"}
+
+![](images/clipboard-2769024026.png){fig-align="left" width="543"}
+
+# 2. Sugar per Volume Clustering
+
+------------------------------------------------------------------------
+
+### Step 1: Select Column
+
+```{r}
+colnames(data.set)
+price.sugar.data.set <- data.set[c('pricePerVolume', 'sugar', 'lactose', 'sucrose', 'honey')]
+colnames(price.sugar.data.set)
+
+# sum of sugar
+price.sugar.data.set$sugar <- rowSums(price.sugar.data.set[, c('sugar', 'lactose', 'sucrose', 'honey')], na.rm = TRUE)
+# remove column
+price.sugar.data.set <- price.sugar.data.set[, !names(price.sugar.data.set) %in% c('lactose', 'sucrose', 'honey')]
+
+price.sugar.data.set <- as.data.frame(scale(price.sugar.data.set))
+colnames(price.sugar.data.set)
+```
+
+### Step 2: Cleaning Data set
+
+```{r}
+# Replace NA value to ZERO value
+# price.sugar.data.set[is.na(price.sugar.data.set)] <- 0
+#price.sugar.data.set
+```
+
+### Step 3: Plot the price per sugar
+
+```{r}
+summary(price.sugar.data.set)
+# mean.price = mean(price.sugar.data.set$pricePerVolume)
+
+# plot(
+#    x = price.sugar.data.set$pricePerVolume,
+#    y = price.sugar.data.set$sugar,
+#    xlab = "Price (bath)",
+#    ylab = "Total Sugar",
+#    main = "[Before Clustering] Price Per Sugar Milk", 
+#    pch= 16,
+#    col = ifelse(price.sugar.data.set$pricePerVolume < mean.price, "green", "red")
+# )
+# abline(v = mean.price, col = "orange", lwd = 2, lty = 2)
+# text(x = max(price.sugar.data.set$pricePerVolume) - 0.05,
+#      y = mean.price,
+#      labels = paste("Mean price =", round(mean.price, 4), " bath"),
+#      pos = 3,
+#      col = "orange",
+#      cex = 1)
+```
+
+### Step 4: Clustering and summaries
+
+```{r}
+set.seed(123)
+# price.sugar.data.set
+elbow.point.sugar.price = elbowPointFunc(price.sugar.data.set)
+print(paste("elbow.point.sugar.price cluster of sugar number is", elbow.point.sugar.price))
+
+# Choose The number of cluseter "k" by Elbow method -> best value is 3
+cluster.size = 3
+
+# Cluseting with K-means
+model.sugar.price = kmeans(price.sugar.data.set, cluster.size)
+model.sugar.price
+# Define color of each cluster
+cluster_colors <- c("purple", "green", "blue", "pink", "orange")[model.sugar.price$cluster]
+plot(
+   x =  price.sugar.data.set$sugar,
+   y =  price.sugar.data.set$pricePerVolume,
+   xlab = "Total Sugar",
+   ylab = "Price",
+   main = "Clustering of Price Per Sugar Milk",
+   pch = 16,
+   col = cluster_colors
+)
+legend("topright",
+       legend = paste("Cluster", 1:cluster.size), 
+       fill = c("purple", "green", "blue", "pink", "orange")[1:cluster.size], 
+       title = "Clusters",
+       xpd = TRUE,
+       inset = c(0, 0))
+
+# Plot centroid
+points(
+  x = model.sugar.price$centers[, "sugar"],
+  y = model.sugar.price$centers[, "pricePerVolume"],
+  pch=8,
+  cex=2,
+  col="red"
+)
+
+model.sugar.price$cluster <- model.sugar.price$cluster
+sugar.result <- data.frame(ProductName = data.set$productName, Price = data.set$price, Cluster = model.sugar.price$cluster)
+for (cluster.no in sort(unique(sugar.result$Cluster))) {
+  print(sugar.result[sugar.result$Cluster == cluster.no,])
+}
+
+```
+
+จากราฟ สามารถอธิบายกลุ่มออกสินค้าได้ 3 กลุ่ม
+
+1.  กลุ่มสินค้าที่น้ำตาลสูง จะพบว่า ราคาของสินค้า จะอยู่ในช่วง ที่ราคาต่ำ ไปจนถึง ปานกลาง (อ้างอิงจาก ค่าเฉลี่ยของราคาสินค้า) บริษัท สามารถเจาะตลาดของลูกค้ากลุ่มนี้ ที่ชอบทานรสชาติหวาน และ มีราคาทีคุ้มค่า และสามารถพบสินค้าได้ตามร้านค้าทั้วไปได้
+2.  กลุ่มสินค้าที่น้ำตาลต่ำ ราคา กลางๆ สินค้ากลุ่มบุคคลทั่วไป ที่เริ่มมีการรักษาสุขภาพ ที่มีการปรับลดน้ำตาล เพื่อเจาะกลุ่มลูกค้าทั่วไปที่ต้องการสินค้าที่มีน้ำตาลต่ำ และ สามารถพบได้ตามร้านค้าทั่วไป
+3.  สินค้ากลุ่มสุขภาพ หรือ พรีเมียม ซึ่งเป็นวัถุดิบเฉพาะ อาทิ นมโอ๊ต เป็นต้น ซึ่งสินค้ากลุ่มนี้จะพบได้กับห้างสรรพสินค้า ขนาดกลาง ถึงขนาดใหญ่เท่านั้น
+
+![](images/clipboard-2218702598.png){fig-align="left" width="497"}
+
+![](images/IMG_8506.JPG){fig-align="left" width="499"}
+
+![](images/IMG_8507.JPG){fig-align="left" width="500"}
+
+------------------------------------------------------------------------
+
+# 3. Price per nutritional
+
+### Step 1: Plot nutritional and Price relationship
+
+```{r}
+colnames(data.set)
+
+# Total Ingredient
+intd.col.name <- c('sodium','iron','fiber','calcium','carbohydrate','fat', 'protein','polydextrose','potassium', 'vitamin...49', 'omega')
+ind.sum.data.set <- data.set[c('volume','pricePerVolume', intd.col.name)]
+names(ind.sum.data.set)[names(intd.col.name) == 'vitamin...26'] <- 'vitamin'
+
+# sum of sugar
+ind.sum.data.set[is.na(ind.sum.data.set)] <- 0
+ind.sum.data.set$totalNutritional <- rowSums(ind.sum.data.set[c(intd.col.name)] > 0, na.rm = TRUE)
+
+# remove column
+ind.sum.data.set <- ind.sum.data.set[, !names(ind.sum.data.set) %in% intd.col.name]
+
+# Normalize data
+ind.sum.data.set.scaled <- as.data.frame(scale(ind.sum.data.set))
+ind.sum.data.set.scaled
+
+# png("Group3_pairs.png", width = 1000, height = 800)
+pairs(
+   ind.sum.data.set.scaled,
+   main = "Group Nutritional",
+   pch= 16
+)
+# dev.off()
+```
+
+### Step 2: Clustering nutritional with price data set
+
+```{r}
+set.seed(150)
+# price.sugar.data.set
+elbow.point.ind.price = elbowPointFunc(ind.sum.data.set.scaled)
+print(paste("Ingredient perprice cluster of sugar number is", elbow.point.ind.price))
+
+# Choose The number of cluseter "k" by Elbow method -> best value is 3
+cluster.size = 4
+
+# Mapping column
+ind.sum.data.set.scaled <- ind.sum.data.set.scaled[, names(ind.sum.data.set.scaled) %in% c('pricePerVolume', 'totalNutritional')]
+
+# Cluseting with K-means
+ind.sum.data.set.price = kmeans(ind.sum.data.set.scaled, cluster.size)
+ind.sum.data.set.price
+
+# Define color of each cluster
+cluster_colors <- c("purple", "green", "yellow", "pink", "orange")[ind.sum.data.set.price$cluster]
+
+plot(
+   ind.sum.data.set.scaled,
+   xlab = "Price",
+   ylab = "Nutritional Amount",
+   main = "Clustering of Price Per Nutritional amount",
+   pch = 16,
+   col = cluster_colors
+)
+legend(
+  "topright",
+   legend = paste("Cluster", 1:cluster.size),
+   fill = c("purple", "green", "yellow", "pink", "orange")[1:cluster.size],
+   title = "Clusters",
+   xpd = TRUE,
+   inset = c(0.4, 0)
+)
+
+# Plot centroid
+points(
+  ind.sum.data.set.price$centers,
+  pch=8,
+  cex=2,
+  col="red"
+)
+
+ind.sum.data.set.price$cluster <- ind.sum.data.set.price$cluster
+ind.result <- data.frame(ProductName = data.set$productName, Price = data.set$price, Cluster = ind.sum.data.set.price$cluster)
+for (cluster.no in sort(unique(ind.result$Cluster))) {
+  print(ind.result[ind.result$Cluster == cluster.no,])
+}
+```
